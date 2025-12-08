@@ -2,13 +2,15 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
 import numpy as np
-from ucimlrepo import fetch_ucirepo 
+from ucimlrepo import fetch_ucirepo
 
 # Load dataset
+
 multivariate_gait_data = fetch_ucirepo(id=760) 
 data = multivariate_gait_data.data.features
 
 # Separate features and target
+
 y = data['condition']
 X = data.drop('condition', axis=1)
 
@@ -17,6 +19,7 @@ print("EDA (EXPLORATORY DATA ANALYSIS)")
 print("="*70)
 
 # 1. Visualize some temporal patterns
+
 fig, axes = plt.subplots(1, 3, figsize=(15, 4))
 for cond in [1, 2, 3]:
     sample = data[(data['condition'] == cond) & 
@@ -32,6 +35,7 @@ plt.savefig('temporal_patterns.png')
 print("\n Saved: temporal_patterns.png")
 
 # 2. Angle distribution by condition
+
 plt.figure(figsize=(10, 6))
 for cond in [1, 2, 3]:
     subset = data[data['condition'] == cond]['angle']
@@ -44,9 +48,10 @@ plt.savefig('angle_distribution.png')
 print("\n Saved: angle_distribution.png")
 
 # 3. Correlation heatmap
+
 plt.figure(figsize=(8, 6))
 correlation = data.corr()
-sns.heatmap(correlation, annot=True, cmap='coolwarm', center=0)
+sns.heatmap(correlation, annot=True, cmap='coolwarm')
 plt.title('Correlation Matrix')
 plt.tight_layout()
 plt.savefig('correlation_matrix.png')
@@ -61,6 +66,7 @@ print(f'- Sum of missing values:\n{data.isna().sum()}')
 print(f"---> No missing values")
 print("="*70)
 
+# 4. Detailed temporal patterns for each joint and condition
 
 fig, axes = plt.subplots(3, 3, figsize=(15, 12))
 
@@ -84,6 +90,11 @@ plt.savefig('detailed_temporal_patterns.png', dpi=300)
 print(" Saved: detailed_temporal_patterns.png")
 
 # Statistics for every combination of condition and joint
-print("\nAverage statistics for condition and joint:")
+
+print("\n Average statistics for condition and joint:")
 stats = data.groupby(['condition', 'joint'])['angle'].agg(['mean', 'std', 'min', 'max'])
 print(stats)
+
+
+sns.pairplot(data, hue='condition', vars=['angle', 'time'])
+plt.savefig('pairplot.png')
