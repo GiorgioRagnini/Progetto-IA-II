@@ -96,5 +96,3 @@ stats = data.groupby(['condition', 'joint'])['angle'].agg(['mean', 'std', 'min',
 print(stats)
 
 
-sns.pairplot(data, hue='condition', vars=['angle', 'time'])
-plt.savefig('pairplot.png')
