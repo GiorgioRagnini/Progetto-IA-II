@@ -4,11 +4,18 @@ import seaborn as sns
 import numpy as np
 from scipy import stats
 from ucimlrepo import fetch_ucirepo
+from src.features import estimate_fs_from_time, rms, dominant_frequency, plot_corr_heatmap
+from scipy.fft import rfft, rfftfreq
 
 # Load dataset
 
 multivariate_gait_data = fetch_ucirepo(id=760) 
 data = multivariate_gait_data.data.features
+
+# Save raw data to CSV
+data.to_csv("data/raw/gait_raw.csv", index=False)
+print('\n Saved: gait_raw.csv')
+
 
 # Separate features and target
 
@@ -33,7 +40,7 @@ for cond in [1, 2, 3]:
     axes[cond-1].set_title(f'Condition {cond}')
     axes[cond-1].set_xlabel('Time')
     axes[cond-1].set_ylabel('Angle (degrees)')
-plt.savefig('temporal_patterns.png')
+plt.savefig('png_EDA/temporal_patterns.png')
 print("\n Saved: temporal_patterns.png")
 
 # 2. Angle distribution by condition
@@ -46,7 +53,7 @@ plt.xlabel('Angle (degrees)')
 plt.ylabel('Frequency')
 plt.legend()
 plt.title('Angle Distribution by Condition')
-plt.savefig('angle_distribution.png')
+plt.savefig('png_EDA/angle_distribution.png')
 print("\n Saved: angle_distribution.png")
 
 # 3. Correlation heatmap
@@ -56,7 +63,7 @@ correlation = data.corr()
 sns.heatmap(correlation, annot=True, cmap='coolwarm')
 plt.title('Correlation Matrix')
 plt.tight_layout()
-plt.savefig('correlation_matrix.png')
+plt.savefig('png_EDA/correlation_matrix.png')
 print("\n Saved: correlation_matrix.png")
 
 print("\n" + "="*70)
@@ -88,11 +95,10 @@ for joint in [1, 2, 3]:
         ax.grid(True, alpha=0.3)
 
 plt.tight_layout()
-plt.savefig('detailed_temporal_patterns.png', dpi=300)
+plt.savefig('png_EDA/detailed_temporal_patterns.png', dpi=300)
 print(" Saved: detailed_temporal_patterns.png")
 
 # 5. Analysis of Subjects' Variability
-# - Plot temporal patterns for each subject under the same condition and joint, to see if normalization is needed.
 
 fig, axes = plt.subplots(2, 5, figsize=(20, 8))
 
@@ -111,7 +117,7 @@ for i, subject in enumerate(range(1, 11)):
     axes[i].set_ylabel('Angle')
 
 plt.tight_layout()
-plt.savefig("Subjects' variability.png", dpi=300)
+plt.savefig("png_EDA/Subjects' variability.png", dpi=300)
 print("\n Saved: Subjects' variability.png")
 
 # 6. Analysis to see the differences between Conditions
@@ -132,63 +138,24 @@ for joint in [1, 2, 3]:
     print(f"  F-statistic: {f_stat:.4f}")
     print(f"  P-value: {p_value:.4e}")
     print(f"  Significant differences: {'Yes' if p_value < 0.05 else 'No'}")
+print("\n" + "="*80)
+
+
+# Statistics for every combination of condition and joint
+
+print("\n" + "="*80)
+print("\n Average statistics for condition and joint:")
+print("="*80)
+stats = data.groupby(['condition', 'joint'])['angle'].agg(['mean', 'std', 'min', 'max'])
+print(stats)
+print("="*80)
 
 
 
+# 8 Additional EDA: Feature extraction and correlation heatmaps
 
 
-
-# 7. Additional EDA: Feature extraction and correlation heatmaps
-
-from scipy.fft import rfft, rfftfreq
-
-# Helper: feature functions
-
-def rms(x: pd.Series) -> float:
-    x = x.to_numpy(dtype=float)
-    return float(np.sqrt(np.mean(x**2)))
-
-def estimate_fs_from_time(t: pd.Series) -> float:
-    """
-    Estimate sampling frequency (Hz) from time column.
-    Works even if time is not perfectly regular.
-    If estimation fails, returns a safe default.
-    """
-    t = pd.to_numeric(t, errors="coerce").dropna().to_numpy(dtype=float)
-    if len(t) < 3:
-        return 100.0
-    dt = np.diff(np.sort(t))
-    dt = dt[dt > 0]
-    if len(dt) == 0:
-        return 100.0
-    fs = 1.0 / np.median(dt)
-    if not np.isfinite(fs) or fs <= 0:
-        return 100.0
-    return float(fs)
-
-def dominant_frequency(angle: pd.Series, time: pd.Series) -> float:
-    """
-    Dominant frequency (Hz) via FFT on de-meaned signal.
-    Uses sampling frequency estimated from time.
-    """
-    y = pd.to_numeric(angle, errors="coerce").dropna().to_numpy(dtype=float)
-    if len(y) < 8:
-        return np.nan
-    fs = estimate_fs_from_time(time)
-    y = y - np.mean(y)
-
-    yf = np.abs(rfft(y))
-    xf = rfftfreq(len(y), d=1/fs)
-
-    # ignore 0 Hz (DC) if possible
-    if len(yf) > 1:
-        idx = np.argmax(yf[1:]) + 1
-    else:
-        idx = 0
-    return float(xf[idx])
-
-
-# 7.1) Build feature tables
+# 8.1 Build feature tables
 
 grp = data.groupby(["subject", "condition", "joint"], dropna=False)
 
@@ -216,7 +183,7 @@ features_all = pd.merge(
 )
 
 
-# 7.2) Correlation matrices
+# 8.2 Correlation matrices
 
 corr_stats = features_all[["mean", "std", "min", "max"]].corr(numeric_only=True)
 corr_rom   = features_all[["ROM"]].corr(numeric_only=True)  # (1x1, not shown)
@@ -226,47 +193,23 @@ corr_dyn = features_all[["ROM", "RMS", "dominant_freq"]].corr(numeric_only=True)
 corr_all   = features_all[["mean", "std", "min", "max", "ROM", "RMS", "dominant_freq"]].corr(numeric_only=True)
 
 
+# 8.3 Plot and save heatmaps
 
-# 7.3) Heatmap plotter
+plot_corr_heatmap(corr_stats, "Correlation (Stats: mean/std/min/max)", "png_EDA/corr_stats.png", annot=True)
+plot_corr_heatmap(corr_dyn,   "Correlation (Dynamic features: ROM, RMS, Dominant Freq)", "png_EDA/corr_dynamic_features.png", annot=True)
+plot_corr_heatmap(corr_all, "Correlation (All extracted features)", "png_EDA/corr_all_features.png", annot=True)
 
-def plot_corr_heatmap(corr: pd.DataFrame, title: str, filename: str, annot=True):
-    plt.figure(figsize=(8, 6))
-    sns.heatmap(
-        corr,
-        annot=annot,
-        fmt=".2f",
-        cmap="coolwarm",
-        vmin=-1, vmax=1,
-        square=True,
-        cbar_kws={"label": "Pearson r"}
-    )
-    plt.title(title)
-    plt.tight_layout()
-    plt.savefig(filename, dpi=300)
-    plt.show()
-    print(f"Saved: {filename}")
+# 8.4 Print tables and correlations
 
-
-# 7.4) Plot and save heatmaps
-
-plot_corr_heatmap(corr_stats, "Correlation (Stats: mean/std/min/max)", "corr_stats.png", annot=True)
-plot_corr_heatmap(corr_dyn,   "Correlation (Dynamic features: ROM, RMS, Dominant Freq)", "corr_dynamic_features.png", annot=True)
-plot_corr_heatmap(corr_all, "Correlation (All extracted features)", "corr_all_features.png", annot=True)
-
-# 7.5) Print tables and correlations
-
-print("\n=== Feature table preview ===")
-print(features_all.head(12))
+print("\n=== Feature table head ===")
+print(features_all.head())
 
 print("\n=== Correlation (all features) ===")
 print(corr_all)
 
+# 8.5 Save features to CSV
+features_all.to_csv(
+    "data/processed/gait_features_v1.csv",
+    index=False)
 
-
-# Statistics for every combination of condition and joint
-
-print("\n" + "="*80)
-print("\n Average statistics for condition and joint:")
-print("="*80)
-stats = data.groupby(['condition', 'joint'])['angle'].agg(['mean', 'std', 'min', 'max'])
-print(stats)
+print("\n Saved: gait_features_v1.csv")
