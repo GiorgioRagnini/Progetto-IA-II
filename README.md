@@ -59,6 +59,8 @@ I seguenti modelli sono stati confrontati:
 
 -Random Forest
 
+-Ridge classifier
+
 -Gaussian Naive Bayes
 
 La scelta include modelli:
