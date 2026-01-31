@@ -61,7 +61,7 @@ I seguenti modelli sono stati confrontati:
 
 -Ridge classifier
 
--Gaussian Naive Bayes
+-Gaussian Naive-Bayes
 
 La scelta include modelli:
 
